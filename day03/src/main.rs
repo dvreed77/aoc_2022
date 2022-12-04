@@ -45,7 +45,6 @@ fn main() {
         let a = sack[0];
         let b = sack[1];
         let c = sack[2];
-        println!("{} {} {}", a, b, c);
 
         for d in a.chars() {
             if b.contains(d) && c.contains(d) {
