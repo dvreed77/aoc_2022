@@ -1,69 +1,63 @@
+use nom::{
+    branch::alt, bytes::complete::tag, character::complete, combinator::map,
+    sequence::separated_pair, *,
+};
 use std::collections::BTreeMap;
 
-fn parse_instructions(i: &str) -> Vec<(&str, i32)> {
-    let d = i
-        .lines()
-        .map(|x| {
-            let x1 = x.split(" ").collect::<Vec<&str>>();
-            let d = x1[0];
-            let l = x1[1].parse::<i32>().unwrap();
-
-            return (d, l);
-        })
-        .collect::<Vec<(&str, i32)>>();
-
-    return d;
+#[derive(Debug, Clone, Copy)]
+enum Dir {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
-fn move_head(dir: &str, pos: (i32, i32)) -> (i32, i32) {
+fn dir_parser(i: &str) -> nom::IResult<&str, Dir> {
+    alt((
+        map(tag("U"), |_| Dir::Up),
+        map(tag("D"), |_| Dir::Down),
+        map(tag("L"), |_| Dir::Left),
+        map(tag("R"), |_| Dir::Right),
+    ))(i)
+}
+
+fn line(i: &str) -> nom::IResult<&str, (Dir, u32)> {
+    return separated_pair(dir_parser, tag(" "), complete::u32)(i);
+}
+
+fn parser(i: &str) -> nom::IResult<&str, Vec<(Dir, u32)>> {
+    nom::multi::separated_list1(nom::character::complete::newline, line)(i)
+}
+
+fn move_head(dir: Dir, pos: (i32, i32)) -> (i32, i32) {
     return match dir {
-        "U" => (pos.0, pos.1 + 1),
-        "D" => (pos.0, pos.1 - 1),
-        "L" => (pos.0 - 1, pos.1),
-        "R" => (pos.0 + 1, pos.1),
-        _ => {
-            println!("Unknown direction: {}", dir);
-            (pos.0, pos.1)
-        }
+        Dir::Up => (pos.0, pos.1 + 1),
+        Dir::Down => (pos.0, pos.1 - 1),
+        Dir::Left => (pos.0 - 1, pos.1),
+        Dir::Right => (pos.0 + 1, pos.1),
     };
 }
 
 fn move_tail(head: (i32, i32), tail: (i32, i32)) -> (i32, i32) {
     let (dx, dy) = (head.0 - tail.0, head.1 - tail.1);
 
-    // println!("DX{} DY{}", dx, dy);
-
     if dx.abs() <= 1 && dy.abs() <= 1 {
         return tail;
     }
-    let new_tail = match (dx, dy) {
-        (2, 2) => (tail.0 + 1, tail.1 + 1),
-        (1, 2) => (tail.0 + 1, tail.1 + 1),
-        (0, 2) => (tail.0, tail.1 + 1),
-        (-1, 2) => (tail.0 - 1, tail.1 + 1),
-        (-2, 2) => (tail.0 - 1, tail.1 + 1),
 
-        (-2, 1) => (tail.0 - 1, tail.1 + 1),
-        (-2, 0) => (tail.0 - 1, tail.1),
-        (-2, -1) => (tail.0 - 1, tail.1 - 1),
-
-        (-2, -2) => (tail.0 - 1, tail.1 - 1),
-        (-1, -2) => (tail.0 - 1, tail.1 - 1),
-        (0, -2) => (tail.0, tail.1 - 1),
-        (1, -2) => (tail.0 + 1, tail.1 - 1),
-        (2, -2) => (tail.0 + 1, tail.1 - 1),
-
-        (2, -1) => (tail.0 + 1, tail.1 - 1),
-        (2, 0) => (tail.0 + 1, tail.1),
-        (2, 1) => (tail.0 + 1, tail.1 + 1),
-
-        _ => {
-            println!("OTHER");
-            return (tail.0, tail.1);
-        }
+    let nx = match dx {
+        x if x > 0 => 1,
+        x if x < 0 => -1,
+        _ => 0,
     };
 
-    return new_tail;
+    let ny = match dy {
+        y if y > 0 => 1,
+        y if y < 0 => -1,
+        _ => 0,
+    };
+
+    return (tail.0 + nx, tail.1 + ny);
 }
 
 fn main() {
@@ -78,9 +72,7 @@ D 1
 L 5
 R 2";
 
-    let moves = parse_instructions(text);
-    // let mut head = (0, 0);
-    // let mut tail = (0, 0);
+    let moves = parser(text).unwrap().1;
 
     let len = 10;
 
@@ -103,7 +95,6 @@ R 2";
                 .entry(snake[len - 1])
                 .and_modify(|v| *v += 1)
                 .or_insert(1);
-            // println!("{} {} {:?} {:?}", dir, n_steps, head, tail);
         }
     }
 
