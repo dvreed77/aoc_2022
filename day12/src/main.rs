@@ -1,11 +1,5 @@
 use std::collections::{HashSet, VecDeque};
 
-// #[derive(Debug, Clone, Copy)]
-// enum Tile {
-//     Start { x: i32, y: i32, h: i32 },
-//     End { x: i32, y: i32, h: i32 },
-//     Path { x: i32, y: i32, h: i32 },
-// }
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 struct Tile {
     idx: usize,
@@ -52,8 +46,6 @@ fn get_neighbors(idx: usize, width: usize, height: usize) -> Vec<usize> {
 fn parse_input(i: &str) -> (Vec<Tile>, usize, usize, usize, usize) {
     let mut tiles = Vec::new();
 
-    let alphabet = "abcdefghijklmnopqrstuvwxyz";
-
     let mut s_idx: usize = 0;
     let mut e_idx: usize = 0;
     let width = i.lines().next().unwrap().len();
@@ -65,46 +57,29 @@ fn parse_input(i: &str) -> (Vec<Tile>, usize, usize, usize, usize) {
                 'S' => {
                     s_idx = x_y_to_idx(x, y, width);
 
-                    let h = alphabet
-                        .chars()
-                        .position(|c1| c1 == 'a')
-                        .expect(&format!("{}", c)) as i32;
-
                     Tile {
                         idx: s_idx,
                         x: x as i32,
                         y: y as i32,
-                        h,
+                        h: 0,
                     }
                 }
                 'E' => {
                     e_idx = x_y_to_idx(x, y, width);
 
-                    let h = alphabet
-                        .chars()
-                        .position(|c1| c1 == 'z')
-                        .expect(&format!("{}", c)) as i32;
-
                     Tile {
                         idx: e_idx,
                         x: x as i32,
                         y: y as i32,
-                        h,
+                        h: 25,
                     }
                 }
-                _ => {
-                    let h = alphabet
-                        .chars()
-                        .position(|c1| c1 == c)
-                        .expect(&format!("{}", c)) as i32;
-
-                    Tile {
-                        idx: x_y_to_idx(x, y, width),
-                        x: x as i32,
-                        y: y as i32,
-                        h,
-                    }
-                }
+                _ => Tile {
+                    idx: x_y_to_idx(x, y, width),
+                    x: x as i32,
+                    y: y as i32,
+                    h: c as i32 - 'a' as i32,
+                },
             };
 
             tiles.push(tile);
@@ -116,7 +91,6 @@ fn parse_input(i: &str) -> (Vec<Tile>, usize, usize, usize, usize) {
 
 fn main() {
     let input = include_str!("../input.txt");
-
     // let input = include_str!("../example.txt");
 
     let (tiles, s_idx, e_idx, width, height) = parse_input(input);
@@ -153,8 +127,6 @@ fn main() {
         .map(|t| t.idx)
         .collect::<Vec<usize>>();
 
-    // dbg!(&starts);
-
     let mut dists = vec![];
     for s in starts {
         let mut queue = VecDeque::from(vec![(tiles[s], 0)]);
@@ -185,7 +157,6 @@ fn main() {
     }
 
     let f = dists.iter().filter_map(|&d| d).collect::<Vec<i32>>();
-    dbg!(f.iter().min().unwrap());
 
-    // println!("Part 1: {}", d);
+    println!("Part 2: {}", f.iter().min().unwrap());
 }
