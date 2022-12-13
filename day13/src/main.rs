@@ -7,12 +7,38 @@ use nom::{
     sequence::{delimited, preceded, separated_pair, tuple},
     *,
 };
-use std::fmt;
+use std::{cmp::Ordering, collections::HashSet, fmt};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 enum Item {
     Value(u32),
     List(Vec<Item>),
+}
+
+impl Ord for Item {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Item::Value(s), Item::Value(o)) => s.cmp(o),
+            (Item::Value(n), Item::List(_)) => Item::List(vec![Item::Value(*n)]).cmp(other),
+            (Item::List(_), Item::Value(n)) => self.cmp(&Item::List(vec![Item::Value(*n)])),
+            (Item::List(left), Item::List(right)) => {
+                for i in 0..left.len().min(right.len()) {
+                    match left[i].cmp(&right[i]) {
+                        Ordering::Less => return Ordering::Less,
+                        Ordering::Greater => return Ordering::Greater,
+                        _ => {}
+                    }
+                }
+                left.len().cmp(&right.len())
+            }
+        }
+    }
+}
+
+impl PartialOrd for Item {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl fmt::Debug for Item {
@@ -41,42 +67,38 @@ fn parser(i: &str) -> IResult<&str, Vec<(Item, Item)>> {
 }
 
 fn match_list(list_a: Vec<Item>, list_b: Vec<Item>) -> bool {
-    // println!("Compare {:?} vs {:?}", list_a, list_b);
+    println!("Compare {:?} vs {:?}", list_a, list_b);
     for i in 0..list_a.len() {
         let a = list_a[i].clone();
 
         if i >= list_b.len() {
-            // println!("Right side ran out of items, so inputs are not in the right order");
+            println!("Right side ran out of items, so inputs are not in the right order");
             return false;
         }
         let b = list_b[i].clone();
 
         match (&a, &b) {
             (Item::Value(x), Item::Value(y)) => {
-                // println!("Val/Val");
                 if x < y {
-                    // println!("A");
+                    println!("A");
                     return true;
                 } else if y < x {
-                    // println!("Right side is smaller, so inputs are not in the right order");
+                    println!("Right side is smaller, so inputs are not in the right order");
                     return false;
                 }
             }
             (Item::List(x), Item::Value(y)) => {
-                // println!("List/Value");
                 return is_in_order((Item::List(x.clone()), Item::List(vec![Item::Value(*y)])));
             }
             (Item::Value(x), Item::List(y)) => {
-                // println!("List/Value");
                 return is_in_order((Item::List(vec![Item::Value(*x)]), Item::List(y.clone())));
             }
             (Item::List(x), Item::List(y)) => {
-                // println!("List/Value");
                 return is_in_order((Item::List(x.clone()), Item::List(y.clone())));
             }
         }
     }
-    // println!("C");
+    println!("C");
     return true;
 }
 fn is_in_order((a, b): (Item, Item)) -> bool {
@@ -95,23 +117,30 @@ fn main() {
     // let input = include_str!("../example.txt");
     let input = include_str!("../input.txt");
 
-    // dbg!(list_parser("[1,[2,[3,[4,[5,6,7]]]],8,9]"));
-    // dbg!(list_parser("[[1],[2,3,4]]"));
-
     let item_pairs = parser(input).unwrap().1;
-
-    let pair = &item_pairs[127];
-    let mut out = vec![];
+    let pair = &item_pairs[140];
     is_in_order((pair.0.clone(), pair.1.clone()));
-    // println!("{:?}", item_pairs[0].1);
 
-    for (idx, pair) in item_pairs.iter().enumerate() {
-        if is_in_order((pair.0.clone(), pair.1.clone())) {
-            out.push(idx + 1);
-        }
-    }
+    // let mut out = vec![];
+    // let mut out2 = vec![];
 
-    // dbg!(&out);
+    // for (idx, pair) in item_pairs.iter().enumerate() {
+    //     if is_in_order((pair.0.clone(), pair.1.clone())) {
+    //         out2.push(idx + 1);
+    //     }
 
-    dbg!(out.iter().sum::<usize>());
+    //     if pair.0 < pair.1 {
+    //         out.push(idx + 1)
+    //     }
+    // }
+
+    // let a: HashSet<usize> = HashSet::from_iter(out2.clone());
+    // let b: HashSet<usize> = HashSet::from_iter(out.clone());
+
+    // dbg!(item_pairs[140].clone());
+
+    //   // dbg!(b.difference(&a));
+
+    // dbg!(out.iter().sum::<usize>());
+    // dbg!(out2.iter().sum::<usize>());
 }
