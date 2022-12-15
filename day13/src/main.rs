@@ -66,27 +66,23 @@ fn parser(i: &str) -> IResult<&str, Vec<(Item, Item)>> {
     separated_list1(tag("\n\n"), separated_pair(item_value, newline, item_value))(i)
 }
 
-fn match_list(list_a: Vec<Item>, list_b: Vec<Item>) -> bool {
-    println!("Compare {:?} vs {:?}", list_a, list_b);
-    for i in 0..list_a.len() {
+fn match_list(list_a: Vec<Item>, list_b: Vec<Item>) -> Ordering {
+    // println!("Compare {:?} vs {:?}", list_a, list_b);
+    for i in 0..list_a.len().min(list_b.len()) {
         let a = list_a[i].clone();
 
-        if i >= list_b.len() {
-            println!("Right side ran out of items, so inputs are not in the right order");
-            return false;
-        }
+        // if i >= list_b.len() {
+        //     // println!("Right side ran out of items, so inputs are not in the right order");
+        //     return Ordering::Greater;
+        // }
         let b = list_b[i].clone();
 
         match (&a, &b) {
-            (Item::Value(x), Item::Value(y)) => {
-                if x < y {
-                    println!("A");
-                    return true;
-                } else if y < x {
-                    println!("Right side is smaller, so inputs are not in the right order");
-                    return false;
-                }
-            }
+            (Item::Value(x), Item::Value(y)) => match x.cmp(&y) {
+                Ordering::Less => return Ordering::Less,
+                Ordering::Greater => return Ordering::Greater,
+                _ => {}
+            },
             (Item::List(x), Item::Value(y)) => {
                 return is_in_order((Item::List(x.clone()), Item::List(vec![Item::Value(*y)])));
             }
@@ -98,12 +94,13 @@ fn match_list(list_a: Vec<Item>, list_b: Vec<Item>) -> bool {
             }
         }
     }
-    println!("C");
-    return true;
+    // println!("C");
+    return list_a.len().cmp(&list_b.len());
+    // return true;
 }
-fn is_in_order((a, b): (Item, Item)) -> bool {
+fn is_in_order((a, b): (Item, Item)) -> Ordering {
     match (a, b) {
-        (Item::Value(x), Item::Value(y)) => x < y,
+        (Item::Value(x), Item::Value(y)) => x.cmp(&y),
         (Item::List(x), Item::List(y)) => match_list(x, y),
         _ => {
             println!("HERE");
@@ -121,26 +118,26 @@ fn main() {
     let pair = &item_pairs[140];
     is_in_order((pair.0.clone(), pair.1.clone()));
 
-    // let mut out = vec![];
-    // let mut out2 = vec![];
+    let mut out = vec![];
+    let mut out2 = vec![];
 
-    // for (idx, pair) in item_pairs.iter().enumerate() {
-    //     if is_in_order((pair.0.clone(), pair.1.clone())) {
-    //         out2.push(idx + 1);
-    //     }
+    for (idx, pair) in item_pairs.iter().enumerate() {
+        if is_in_order((pair.0.clone(), pair.1.clone())) != Ordering::Greater {
+            out2.push(idx + 1);
+        }
 
-    //     if pair.0 < pair.1 {
-    //         out.push(idx + 1)
-    //     }
-    // }
+        if pair.0 < pair.1 {
+            out.push(idx + 1)
+        }
+    }
 
-    // let a: HashSet<usize> = HashSet::from_iter(out2.clone());
-    // let b: HashSet<usize> = HashSet::from_iter(out.clone());
+    let a: HashSet<usize> = HashSet::from_iter(out2.clone());
+    let b: HashSet<usize> = HashSet::from_iter(out.clone());
 
-    // dbg!(item_pairs[140].clone());
+    dbg!(item_pairs[140].clone());
 
-    //   // dbg!(b.difference(&a));
+    // dbg!(b.difference(&a));
 
-    // dbg!(out.iter().sum::<usize>());
-    // dbg!(out2.iter().sum::<usize>());
+    dbg!(out.iter().sum::<usize>());
+    dbg!(out2.iter().sum::<usize>());
 }
