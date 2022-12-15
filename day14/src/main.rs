@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
 use nom::{
-    branch::alt,
     bytes::complete::tag,
     character::complete::{self, newline},
-    combinator::{map, value},
     multi::separated_list1,
-    sequence::{delimited, preceded, separated_pair, tuple},
+    sequence::separated_pair,
     *,
 };
 
@@ -86,19 +84,6 @@ fn bounds(paths: HashMap<Point, Block>) -> (i32, i32, i32, i32) {
     (min_x, max_x, min_y, max_y)
 }
 
-fn bounds2(paths: Vec<Path>, all_sand: Vec<Point>) -> (i32, i32, i32, i32) {
-    let mut all_pts = paths.iter().flatten().collect::<Vec<_>>();
-    let mut all_pts2 = all_sand.iter().collect::<Vec<_>>();
-    all_pts.append(&mut all_pts2);
-
-    let min_x = *all_pts.iter().map(|(x, _)| x).min().unwrap();
-    let max_x = *all_pts.iter().map(|(x, _)| x).max().unwrap();
-    let min_y = 0;
-    let max_y = *all_pts.iter().map(|(_, y)| y).max().unwrap();
-
-    (min_x, max_x, min_y, max_y)
-}
-
 fn draw(paths: HashMap<Point, Block>, sand: Point) {
     let (min_x, max_x, min_y, max_y) = bounds(paths.clone());
     let start = (500, 0);
@@ -113,27 +98,6 @@ fn draw(paths: HashMap<Point, Block>, sand: Point) {
                     Block::Sand(_) => print!("o"),
                     Block::Rock(_) => print!("#"),
                 }
-            } else {
-                print!(".");
-            }
-        }
-        println!();
-    }
-}
-
-fn draw2(paths: Vec<Path>, all_sand: Vec<Point>, sand: Point) {
-    let (min_x, max_x, min_y, max_y) = bounds2(paths.clone(), all_sand.clone());
-    let start = (500, 0);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            if (x, y) == start {
-                print!("+");
-            } else if (x, y) == sand {
-                print!("o");
-            } else if all_sand.contains(&(x, y)) {
-                print!("o");
-            } else if paths.iter().any(|path| path.contains(&(x, y))) {
-                print!("#");
             } else {
                 print!(".");
             }
@@ -187,14 +151,14 @@ fn simulate(rocks: HashMap<Point, Block>) {
         })
         .collect::<Vec<_>>();
 
-    draw(rocks.clone(), (0, 0));
+    // draw(rocks.clone(), (0, 0));
     dbg!(sand.len());
 }
 
 fn simulate2(rocks: HashMap<Point, Block>) {
     let mut rocks = rocks.clone();
 
-    let (_, _, min_y, max_y) = bounds(rocks.clone());
+    let (_, _, _, max_y) = bounds(rocks.clone());
 
     let floor = max_y + 1;
     'outer: loop {
@@ -236,62 +200,9 @@ fn simulate2(rocks: HashMap<Point, Block>) {
             _ => None,
         })
         .collect::<Vec<_>>();
-
     // draw(rocks.clone(), (0, 0));
     dbg!(sand.len());
 }
-
-// fn simulate2(paths: Vec<Path>) {
-//     let mut all_sand: Vec<Point> = vec![];
-//     let (_, _, _, max_y) = bounds(paths.clone());
-
-//     let floor = max_y + 1;
-//     'outer: loop {
-//         let mut sand = (500, 0);
-
-//         if all_sand.contains(&sand) {
-//             break 'outer;
-//         }
-
-//         loop {
-//             let (_, y) = sand;
-
-//             let down = (sand.0, sand.1 + 1);
-//             let left = (sand.0 - 1, sand.1 + 1);
-//             let right = (sand.0 + 1, sand.1 + 1);
-
-//             if !paths.iter().any(|path| path.contains(&down))
-//                 && !all_sand.contains(&down)
-//                 && sand.1 < floor
-//             {
-//                 sand = down;
-//                 continue;
-//             }
-
-//             if !paths.iter().any(|path| path.contains(&left))
-//                 && !all_sand.contains(&left)
-//                 && sand.1 < floor
-//             {
-//                 sand = left;
-//                 continue;
-//             }
-
-//             if !paths.iter().any(|path| path.contains(&right))
-//                 && !all_sand.contains(&right)
-//                 && sand.1 < floor
-//             {
-//                 sand = right;
-//                 continue;
-//             }
-
-//             all_sand.push(sand);
-//             break;
-//         }
-//     }
-
-//     draw2(paths.clone(), all_sand.clone(), (0, 0));
-//     dbg!(all_sand.len());
-// }
 
 fn main() {
     // let input = include_str!("../example.txt");
@@ -301,6 +212,6 @@ fn main() {
 
     let paths = expand_paths(paths);
 
-    // simulate(paths.clone());
+    simulate(paths.clone());
     simulate2(paths.clone());
 }
