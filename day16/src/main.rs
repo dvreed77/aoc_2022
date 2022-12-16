@@ -3,22 +3,17 @@ use std::collections::HashMap;
 use nom::{
     bytes::complete::tag,
     character::complete::{self, newline},
-    combinator::{map, opt},
+    combinator::opt,
     multi::{separated_list0, separated_list1},
     sequence::tuple,
     *,
 };
 
-use itertools::Itertools;
-use petgraph::{algo::astar, stable_graph::NodeIndex, Graph};
-// use petgraph::{algo::bellman_ford, dot::Config};
-// use petgraph::{dot::Dot, prelude::*};
-
 #[derive(Debug)]
-struct Valve {
-    name: String,
-    rate: f32,
-    children: Vec<String>,
+struct Valve<'a> {
+    name: &'a str,
+    rate: u32,
+    children: Vec<&'a str>,
 }
 
 fn line_parser(i: &str) -> IResult<&str, Valve> {
@@ -26,7 +21,7 @@ fn line_parser(i: &str) -> IResult<&str, Valve> {
         tag("Valve "),
         complete::alpha1,
         tag(" has flow rate="),
-        complete::i32,
+        complete::u32,
         tag("; tunnel"),
         opt(tag("s")),
         tag(" lead"),
@@ -34,14 +29,14 @@ fn line_parser(i: &str) -> IResult<&str, Valve> {
         tag(" to valve"),
         opt(tag("s")),
         opt(tag(" ")),
-        separated_list0(tag(", "), map(complete::alpha1, |x: &str| x.to_string())),
+        separated_list0(tag(", "), complete::alpha1),
     ))(i)?;
 
     return Ok((
         input,
         Valve {
-            name: name.to_string(),
-            rate: rate as f32,
+            name,
+            rate,
             children,
         },
     ));
@@ -51,148 +46,126 @@ fn parser(i: &str) -> IResult<&str, Vec<Valve>> {
     separated_list1(newline, line_parser)(i)
 }
 
-fn path_cost(
-    path: Vec<String>,
-    dist_map: HashMap<(String, String), f32>,
-    rate_map: HashMap<String, f32>,
-) -> Option<f32> {
-    let mut total_pressure = 0.0;
-    let mut last_pressure = 0.0;
-    let mut time = 0.0;
-    for (i, node) in path.iter().enumerate() {
-        if i == 0 {
-            time += dist_map.get(&("AA".to_owned(), node.clone())).unwrap() + 1.0;
-            last_pressure = rate_map.get(node).unwrap().clone();
-
-            continue;
-        }
-        let d = dist_map.get(&(path[i - 1].clone(), node.clone())).unwrap();
-        let r = rate_map.get(node).unwrap();
-        total_pressure = total_pressure + last_pressure * (d + 1.0);
-        last_pressure += r;
-        time += d + 1.0;
-        if time > 30.0 {
-            return None;
-        }
-        // dbg!(&path[i - 1], &path[i], total_pressure, last_pressure, time);
+fn rec<'a>(
+    node: &'a str,
+    path: &mut Vec<&'a str>,
+    flow_map: &HashMap<&str, u32>,
+    graph: &'a HashMap<&str, Vec<&str>>,
+    remaining: i32,
+    cache: &mut HashMap<(&'a str, Vec<&'a str>, i32), u32>,
+) -> u32 {
+    if remaining <= 0 {
+        return 0;
     }
 
-    if (time <= 30.0) {
-        let d = 30.0 - time;
-        total_pressure = total_pressure + last_pressure * d;
-        Some(total_pressure)
-    } else {
-        None
+    if let Some(&ans) = cache.get(&(node, path.clone(), remaining)) {
+        return ans;
     }
+
+    let mut best = 0;
+
+    let f = *flow_map.get(node).unwrap();
+    let visited = path.contains(&node);
+
+    if f > 0 && !visited {
+        path.push(node);
+        for &child in graph.get(node).unwrap() {
+            let a = rec(child, path, &flow_map, &graph, remaining - 2, cache);
+            best = best.max(a + flow_map.get(node).unwrap() * (remaining as u32 - 1));
+        }
+        path.pop();
+    }
+
+    for &child in graph.get(node).unwrap() {
+        let a = rec(child, path, &flow_map, &graph, remaining - 1, cache);
+        best = best.max(a);
+    }
+
+    cache.insert((node, path.clone(), remaining), best);
+
+    best
 }
 
-fn distances(
-    nodes: Vec<String>,
-    g: Graph<String, f32>,
-    map: HashMap<String, NodeIndex>,
-) -> HashMap<(String, String), f32> {
-    let mut out = HashMap::new();
-
-    for a in nodes.iter().combinations(2) {
-        let n1 = map.get(a[0]).unwrap();
-        let n2 = map.get(a[1]).unwrap();
-
-        let path = astar(
-            &g,
-            n1.clone(),
-            |finish| finish == n2.clone(),
-            |e| *e.weight(),
-            |_| 0.0,
-        );
-        let d = path.unwrap().0;
-        out.insert((a[0].clone(), a[1].clone()), d);
-        out.insert((a[1].clone(), a[0].clone()), d);
+fn rec2<'a>(
+    node: &'a str,
+    path: &mut Vec<&'a str>,
+    flow_map: &HashMap<&str, u32>,
+    graph: &'a HashMap<&str, Vec<&str>>,
+    remaining: i32,
+    cache: &mut HashMap<(&'a str, Vec<&'a str>, i32), u32>,
+) -> u32 {
+    if remaining <= 0 {
+        return 0;
     }
 
-    for n in nodes.iter() {
-        let n1 = map.get("AA").unwrap();
-        let n2 = map.get(n).unwrap();
-
-        let path = astar(
-            &g,
-            n1.clone(),
-            |finish| finish == n2.clone(),
-            |e| *e.weight(),
-            |_| 0.0,
-        );
-        let d = path.unwrap().0;
-        out.insert(("AA".to_owned(), n.clone()), d);
-        out.insert((n.clone(), "AA".to_owned()), d);
+    if let Some(&ans) = cache.get(&(node, path.clone(), remaining)) {
+        return ans;
     }
 
-    out
+    let mut best = 0;
+
+    let f = *flow_map.get(node).unwrap();
+    let visited = path.contains(&node);
+
+    if f > 0 && !visited {
+        path.push(node);
+        for &child in graph.get(node).unwrap() {
+            let a = rec2(child, path, &flow_map, &graph, remaining - 2, cache);
+            best = best.max(a + flow_map.get(node).unwrap() * (remaining as u32 - 1));
+        }
+        path.pop();
+    }
+
+    for &child in graph.get(node).unwrap() {
+        let a = rec2(child, path, &flow_map, &graph, remaining - 1, cache);
+        best = best.max(a);
+    }
+
+    cache.insert((node, path.clone(), remaining), best);
+
+    best
 }
 
 fn part1(valves: Vec<Valve>) {
-    // dbg!(valves);
-    let mut g = Graph::new();
-
-    let rate_map = valves
+    let flow_map = valves
         .iter()
         .map(|x| (x.name.clone(), x.rate))
         .collect::<HashMap<_, _>>();
 
-    let mut map = HashMap::new();
-
-    for v in &valves {
-        let node = g.add_node(v.name.clone());
-        map.insert(v.name.clone(), node);
-    }
-
-    for v in &valves {
-        let this_node = map.get(&v.name).unwrap();
-        for c in &v.children {
-            let child_node = map.get(c).unwrap();
-            g.add_edge(this_node.clone(), child_node.clone(), 1 as f32);
-        }
-    }
-
-    let non_zero_valves = valves
+    let graph = valves
         .iter()
-        .filter(|x| x.rate > 0.0)
-        .map(|x| x.name.clone())
-        .collect::<Vec<_>>();
+        .map(|x| (x.name.clone(), x.children.clone()))
+        .collect::<HashMap<_, _>>();
+    let mut path: Vec<&str> = Vec::new();
+    let mut cache = HashMap::new();
+    let ans: u32 = rec("AA", &mut path, &flow_map, &graph, 30, &mut cache);
 
-    // dbg!(non_zero_valves);
+    println!("Part 1: {}", ans);
+}
 
-    let dist_map = distances(non_zero_valves.clone(), g, map);
-    // let path = ["DD", "BB", "JJ", "HH", "EE", "CC"]
-    //     .iter()
-    //     .map(|x| x.to_string())
-    //     .collect_vec();
-
-    // let d = path_cost(path, dist_map, rate_map);
-
-    // dbg!(d);
-    let perms = non_zero_valves
+fn part2(valves: Vec<Valve>) {
+    let flow_map = valves
         .iter()
-        .cloned()
-        .permutations(non_zero_valves.len());
+        .map(|x| (x.name.clone(), x.rate))
+        .collect::<HashMap<_, _>>();
 
-    let mut costs = vec![];
-    for p in perms {
-        costs.push(path_cost(p, dist_map.clone(), rate_map.clone()));
-    }
+    let graph = valves
+        .iter()
+        .map(|x| (x.name.clone(), x.children.clone()))
+        .collect::<HashMap<_, _>>();
+    let mut path: Vec<&str> = Vec::new();
+    let mut cache = HashMap::new();
+    let ans: u32 = rec2("AA", &mut path, &flow_map, &graph, 26, &mut cache);
 
-    dbg!(costs
-        .iter()
-        .filter_map(|&x| x)
-        .map(|x| x as i32)
-        .collect_vec()
-        .iter()
-        .max());
+    println!("Part 2: {}", ans);
 }
 
 fn main() {
-    let input = include_str!("../input.txt");
-    // let input = include_str!("../example.txt");
+    // let input = include_str!("../input.txt");
+    let input = include_str!("../example.txt");
 
     let valves = parser(input).unwrap().1;
 
-    part1(valves);
+    // part1(valves);
+    part2(valves);
 }
