@@ -74,7 +74,7 @@ struct Shape {
 }
 
 impl Shape {
-    fn new(n: u32) -> Self {
+    fn new(n: u64) -> Self {
         let points = match n % 5 {
             0 => HashSet::from(SHAPE1),
             1 => HashSet::from(SHAPE2),
@@ -94,7 +94,7 @@ impl Shape {
         let pt = (point.0 - self.anchor.0, point.1 - self.anchor.1);
         self.points.contains(&pt)
     }
-    fn init(&mut self, top: i32, n: u32) -> &Self {
+    fn init(&mut self, top: i32, n: u64) -> &Self {
         let points = match n % 5 {
             0 => HashSet::from(SHAPE1),
             1 => HashSet::from(SHAPE2),
